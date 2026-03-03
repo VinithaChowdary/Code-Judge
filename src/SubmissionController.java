@@ -15,6 +15,31 @@ public class SubmissionController {
 
         SubmissionService service = new SubmissionService();
 
+        server.createContext("/submission", (HttpExchange exchange) -> {
+            if (!exchange.getRequestMethod().equalsIgnoreCase("GET")) {
+                exchange.sendResponseHeaders(405, -1);
+                return;
+            }
+
+            try {
+                String path = exchange.getRequestURI().getPath();
+                // path is like /submission/123
+                String[] parts = path.split("/");
+                long id = Long.parseLong(parts[parts.length - 1]);
+
+                String response = service.getSubmission(id);
+
+                exchange.sendResponseHeaders(200, response.getBytes().length);
+                OutputStream os = exchange.getResponseBody();
+                os.write(response.getBytes());
+                os.close();
+
+            } catch (Exception e) {
+                e.printStackTrace();
+                exchange.sendResponseHeaders(500, -1);
+            }
+        });
+
         server.createContext("/submit", (HttpExchange exchange) -> {
 
             if (!exchange.getRequestMethod().equalsIgnoreCase("POST")) {

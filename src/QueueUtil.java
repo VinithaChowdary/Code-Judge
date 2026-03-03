@@ -1,5 +1,3 @@
-// Source code is decompiled from a .class file using FernFlower decompiler (from Intellij IDEA).
-
 
 import redis.clients.jedis.Jedis;
 
