@@ -144,9 +144,29 @@ public class SubmissionWorker {
         channel.basicAck(delivery.getEnvelope().getDeliveryTag(), false);
 
         System.out.println("✅ Processed submission: " + submissionId + " Verdict: " + finalVerdict);
+        
+        try (redis.clients.jedis.Jedis jedis = RedisUtil.getClient()) {
+            jedis.del("retry_count:" + submissionId);
+        } catch (Exception ignored) {}
 
     } catch (Exception e) {
-        e.printStackTrace();
+        System.err.println("❌ Worker processing failed: " + e.getMessage());
+        try (redis.clients.jedis.Jedis jedis = RedisUtil.getClient()) {
+            long retries = jedis.incr("retry_count:" + submissionId);
+            if (retries <= 3) {
+                System.out.println("🔄 Retrying submission " + submissionId + " (Attempt " + retries + ")");
+                channel.basicReject(delivery.getEnvelope().getDeliveryTag(), true);
+            } else {
+                System.out.println("💀 Marking submission " + submissionId + " as permanently failed.");
+                try {
+                    updateSubmissionStatus(submissionId, "SYSTEM_ERROR", "Internal execution failure after retries");
+                } catch (Exception ignored) {}
+                channel.basicReject(delivery.getEnvelope().getDeliveryTag(), false);
+            }
+        } catch (Exception redisEx) {
+            System.err.println("Redis failure during retry check.");
+            channel.basicReject(delivery.getEnvelope().getDeliveryTag(), false);
+        }
     }
 };
 
